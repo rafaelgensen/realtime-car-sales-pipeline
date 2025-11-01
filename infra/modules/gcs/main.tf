@@ -10,12 +10,6 @@ resource "google_storage_bucket" "events_staging" {
   uniform_bucket_level_access = true
 }
 
-resource "google_storage_bucket" "events_staging" {
-  name                        = "cars-sales-config-dataflow-options"
-  location                    = var.region
-  uniform_bucket_level_access = true
-}
-
 # Upload do arquivo JSON com a configuração para o bucket
 resource "google_storage_object" "config_file" {
   name   = "config/input_output_config.json"

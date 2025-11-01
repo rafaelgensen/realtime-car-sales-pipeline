@@ -34,11 +34,10 @@ module "dataflow_iam" {
 
 # Módulo para Job do Dataflow
 module "dataflow_jobs" {
-  source         = "./modules/dataflow/jobs"
+  source         = "./modules/dataflow/job"
   project_id     = var.project_id
-  input_topic    = module.pubsub.events_topic
-  temp_location  = module.gcs.temp_location
   env            = var.env
+  region         = var.region
 
   depends_on = [
     module.dataflow_iam
