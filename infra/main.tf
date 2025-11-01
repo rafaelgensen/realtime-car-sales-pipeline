@@ -3,12 +3,15 @@ provider "google" {
   region  = var.region
 }
 
-#module "pubsub" {
-#  source     = "./modules/pubsub"
-#  project_id = var.project_id
-#  env        = var.env
-#}
+# Módulo para Pub/Sub
+module "pubsub" {
+  source     = "./modules/pubsub"
+  project_id = var.project_id
+  env        = var.env
+  region     = var.region
+}
 
+# Módulo para GCS
 module "gcs" {
   source     = "./modules/gcs"
   project_id = var.project_id
@@ -16,17 +19,28 @@ module "gcs" {
   region     = var.region
 }
 
-#module "bigquery" {
-#  source     = "./modules/bigquery"
-#  project_id = var.project_id
-#  env        = var.env
-#}
+# Módulo para IAM do Dataflow
+module "dataflow_iam" {
+  source         = "./modules/dataflow/iam"
+  project_id     = var.project_id
+  env            = var.env
+  region         = var.region
 
-#module "dataflow" {
-#  source         = "./modules/dataflow"
-#  project_id     = var.project_id
-#  env            = var.env
-#  input_topic    = module.pubsub.topic_name
-#  output_table   = module.bigquery.table_id
-#  temp_location  = module.gcs.temp_location
-#}
+  depends_on = [
+    module.pubsub,
+    module.gcs
+  ]
+}
+
+# Módulo para Job do Dataflow
+module "dataflow_jobs" {
+  source         = "./modules/dataflow/jobs"
+  project_id     = var.project_id
+  input_topic    = module.pubsub.events_topic
+  temp_location  = module.gcs.temp_location
+  env            = var.env
+
+  depends_on = [
+    module.dataflow_iam
+  ]
+}
