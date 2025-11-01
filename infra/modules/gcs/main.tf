@@ -20,9 +20,6 @@ resource "google_storage_bucket_object" "config_file" {
   })
 }
 
-output "config_file_url" {
-  value = google_storage_object.config_file.media_link
-}
 output "temp_location" {
   value = google_storage_bucket.dataflow_temp.name
 }
