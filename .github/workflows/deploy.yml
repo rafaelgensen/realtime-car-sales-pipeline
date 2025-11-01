@@ -1,0 +1,70 @@
+name: Deploy GCP Streaming Infra
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: "Deseja destruir os recursos?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  terraform:
+    name: Terraform Deploy or Destroy - Capabilities
+    runs-on: ubuntu-latest
+
+    if: startsWith(github.head_ref || github.ref_name, 'prod/') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      # Autentica na GCP com o JSON do Service Account
+      - name: Configurar credenciais GCP
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+      # Configura o SDK do gcloud
+      - name: Configurar projeto GCP
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          install_components: 'beta'
+
+      # Define variáveis do Terraform (usadas pelos .tf vars)
+      - name: Exportar variáveis Terraform
+        run: |
+          echo "TF_VAR_project_id=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}" >> $GITHUB_ENV
+          echo "TF_VAR_region=us-central1" >> $GITHUB_ENV
+          echo "TF_VAR_env=prod" >> $GITHUB_ENV
+
+      # Instala Terraform
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.7
+
+      # Inicializa o Terraform
+      - name: Terraform Init
+        working-directory: ./infra
+        run: terraform init
+
+      # Aplica ou destrói conforme input manual
+      - name: Terraform Apply ou Destroy
+        working-directory: ./infra
+        run: |
+          if [ "${{ github.event.inputs.destroy }}" == "true" ]; then
+            echo "⚠️ Destruindo infraestrutura GCP..."
+            terraform destroy -auto-approve
+          else
+            echo "🚀 Aplicando infraestrutura GCP..."
+            terraform apply -auto-approve
+          fi
