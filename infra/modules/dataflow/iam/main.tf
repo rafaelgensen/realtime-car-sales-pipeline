@@ -11,8 +11,7 @@ resource "google_storage_bucket_iam_member" "dataflow_staging" {
 }
 
 resource "google_pubsub_topic_iam_member" "dataflow_pubsub" {
-  topic  = google_pubsub_topic.events.name 
+  topic  = "car-sales-${var.project_id}-${var.env}-events-sub"
   role   = "roles/pubsub.subscriber"
   member = "serviceAccount:terraform-runner@${var.project_id}.iam.gserviceaccount.com"
 }
-
