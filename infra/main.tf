@@ -13,6 +13,7 @@ module "gcs" {
   source     = "./modules/gcs"
   project_id = var.project_id
   env        = var.env
+  region     = var.region
 }
 
 #module "bigquery" {
