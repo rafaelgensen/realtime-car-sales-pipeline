@@ -9,7 +9,3 @@ resource "google_dataflow_job" "streaming" {
     mode = "run"
   }
 }
-
-output "dataflow_job_id" {
-  value = google_dataflow_job.streaming.id
-}

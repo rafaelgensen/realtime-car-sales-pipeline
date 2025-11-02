@@ -6,7 +6,3 @@ resource "google_storage_bucket" "events_staging" {
   uniform_bucket_level_access = true
 }
 
-
-output "events_staging_location" {
-  value = google_storage_bucket.events_staging.name
-}
