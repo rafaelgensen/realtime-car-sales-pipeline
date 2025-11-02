@@ -1,8 +1,8 @@
-resource "google_storage_bucket" "dataflow_temp" {
-  name                        = "cars-sales-${var.project_id}-${var.env}-dataflow-temp"
-  location                    = var.region
-  uniform_bucket_level_access = true
-}
+#resource "google_storage_bucket" "dataflow_temp" {
+#  name                        = "cars-sales-${var.project_id}-${var.env}-dataflow-temp"
+#  location                    = var.region
+#  uniform_bucket_level_access = true
+#}
 
 resource "google_storage_bucket" "events_staging" {
   name                        = "cars-sales-${var.project_id}-${var.env}-events-staging"
