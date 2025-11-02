@@ -79,7 +79,7 @@ jobs:
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
 
           echo '{
-            "input_topic": "cars-sale-'"${PROJECT_ID}"'-'"${ENV}"'-events-sub",
+            "input_topic": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-sub",
             "output_bucket": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-staging"
           }' > config.json
 
@@ -102,13 +102,20 @@ jobs:
           ENV=prod
           REGION=us-central1
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+
+          # Build template mode ON
           export DATAFLOW_TEMPLATE_BUILD=true
+
           python3 dataflow/main.py \
             --runner DataflowRunner \
             --project ${PROJECT_ID} \
             --region ${REGION} \
             --temp_location gs://${BUCKET}/temp \
-            --template_location gs://${BUCKET}/template/main-template
+            --template_location gs://${BUCKET}/template/main-template \
+            --setup_file ./dataflow/setup.py
+
+          # Turn off after template build
+          unset DATAFLOW_TEMPLATE_BUILD
 
       - name: Terraform Init
         working-directory: ./infra
