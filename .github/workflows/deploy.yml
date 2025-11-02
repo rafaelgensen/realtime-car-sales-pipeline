@@ -54,54 +54,54 @@ jobs:
         with:
           terraform_version: 1.5.7
 
-      # Criar o bucket de template se não existir
       - name: Criar bucket de template se não existir
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           REGION=us-central1
           ENV=prod
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
-          
-          echo "Verificando se o bucket ${BUCKET} existe..."
-          if ! gsutil ls -b gs://${BUCKET} >/dev/null 2>&1; then
-            echo "Bucket não encontrado. Criando o bucket ${BUCKET}..."
-            gsutil mb -l ${REGION} gs://${BUCKET}
-          else
-            echo "Bucket ${BUCKET} já existe."
-          fi
+          gsutil ls -b gs://${BUCKET} >/dev/null 2>&1 || gsutil mb -l ${REGION} gs://${BUCKET}
 
-      # Upload dos scripts Python para o bucket template do Dataflow
-      - name: Upload dos scripts Dataflow (.py) para o bucket template
+      - name: Upload dos scripts Dataflow (.py)
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          ENV=prod
+          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+          gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
+          gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
+
+      - name: Upload config input_output_config.json
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           ENV=prod
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
 
-          echo "📦 Enviando scripts Python para gs://${BUCKET}/template/"
-          gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
-          gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
+          echo '{
+            "input_topic": "'"${PROJECT_ID}"'-'"${ENV}"'-events-sub",
+            "output_bucket": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-staging"
+          }' > config.json
 
-      - name: Set Python 3.10 (necessário pro Apache Beam)
+          gsutil cp config.json gs://${BUCKET}/config/input_output_config.json
+
+      - name: Set Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Instalar dependências Python do Dataflow
+      - name: Instalar dependências Python
         run: |
           pip install apache-beam[gcp]==2.53.0
           pip install google-cloud-storage
 
-      # Gerar o template do Dataflow
-      - name: Gerar template do Dataflow
+      - name: Gerar template Dataflow
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           ENV=prod
           REGION=us-central1
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
-
-          echo "🏗️ Gerando template do Dataflow..."
           python3 dataflow/main.py \
             --runner DataflowRunner \
             --project ${PROJECT_ID} \
@@ -117,9 +117,7 @@ jobs:
         working-directory: ./infra
         run: |
           if [ "${{ github.event.inputs.destroy }}" == "true" ]; then
-            echo "⚠️ Destruindo infraestrutura GCP..."
             terraform destroy -auto-approve
           else
-            echo "🚀 Aplicando infraestrutura GCP..."
             terraform apply -auto-approve
           fi

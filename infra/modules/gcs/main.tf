@@ -11,14 +11,14 @@ resource "google_storage_bucket" "events_staging" {
 }
 
 # Upload do arquivo JSON com a configuração para o bucket
-resource "google_storage_bucket_object" "config_file" {
-  name   = "config/input_output_config.json"
-  bucket = "cars-sales-${var.project_id}-${var.env}-dataflow-temp"
-  content = jsonencode({
-    input_topic   = "${var.project_id}-${var.env}-events-sub"
-    output_bucket = "cars-sales-${var.project_id}-${var.env}-events-staging"
-  })
-}
+#resource "google_storage_bucket_object" "config_file" {
+#  name   = "config/input_output_config.json"
+#  bucket = "cars-sales-${var.project_id}-${var.env}-dataflow-temp"
+#  content = jsonencode({
+#    input_topic   = "${var.project_id}-${var.env}-events-sub"
+#    output_bucket = "cars-sales-${var.project_id}-${var.env}-events-staging"
+#  })
+#}
 
 output "events_staging_location" {
   value = google_storage_bucket.events_staging.name
