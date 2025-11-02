@@ -101,13 +101,13 @@ jobs:
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
 
           python3 dataflow/main.py \
-            --runner DataflowRunner \
-            --project ${PROJECT_ID} \
-            --region ${REGION} \
-            --temp_location gs://${BUCKET}/temp \
-            --template_location gs://${BUCKET}/template/main-template \
-            --template \
-            --setup_file ./dataflow/setup.py
+          --runner DataflowRunner \
+          --project ${PROJECT_ID} \
+          --region ${REGION} \
+          --temp_location gs://${BUCKET}/temp \
+          --template_location gs://${BUCKET}/template/main-template \
+          --template=true \
+          --setup_file ./dataflow/setup.py
 
       - name: Terraform Init
         working-directory: ./infra
