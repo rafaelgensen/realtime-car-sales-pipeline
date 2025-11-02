@@ -47,9 +47,10 @@ def run():
         )
 
         def is_template():
-            if custom.mode.is_accessible():
-                return custom.mode.get() == "template"
-            return False
+            try:
+                return custom.mode.is_accessible() and custom.mode.get() == "template"
+            except:
+                return True  # fallback default for build phase
 
         if is_template():
             _ = windowed | "NoOp" >> beam.Map(lambda _: None)
