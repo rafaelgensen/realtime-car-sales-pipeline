@@ -2,11 +2,8 @@ name: Deploy GCP Streaming Infra
 
 on:
   pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
+    branches: [main]
+    types: [opened, synchronize]
 
   workflow_dispatch:
     inputs:
@@ -15,9 +12,7 @@ on:
         required: true
         default: "false"
         type: choice
-        options:
-          - "false"
-          - "true"
+        options: ["false", "true"]
 
 jobs:
   terraform:
@@ -77,12 +72,13 @@ jobs:
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           ENV=prod
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
-
-          echo '{
-            "input_topic": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-sub",
-            "output_bucket": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-staging"
-          }' > config.json
-
+          cat <<EOF > config.json
+          {
+            "input_topic": "cars-sales-${PROJECT_ID}-${ENV}-events-sub",
+            "output_bucket": "cars-sales-${PROJECT_ID}-${ENV}-events-staging"
+          }
+          EOF
+      
           gsutil cp config.json gs://${BUCKET}/config/input_output_config.json
 
       - name: Set Python 3.10
@@ -103,20 +99,14 @@ jobs:
           REGION=us-central1
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
 
-          # Build template mode ON
-          export DATAFLOW_TEMPLATE_BUILD=true
-
           python3 dataflow/main.py \
             --runner DataflowRunner \
             --project ${PROJECT_ID} \
             --region ${REGION} \
             --temp_location gs://${BUCKET}/temp \
             --template_location gs://${BUCKET}/template/main-template \
+            --is_template_build true \
             --setup_file ./dataflow/setup.py
-      
-      # Turn off after template build
-      - name: Clear Template  
-        run: unset DATAFLOW_TEMPLATE_BUILD
 
       - name: Terraform Init
         working-directory: ./infra
