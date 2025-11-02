@@ -102,6 +102,7 @@ jobs:
           ENV=prod
           REGION=us-central1
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+          export DATAFLOW_TEMPLATE_BUILD=true
           python3 dataflow/main.py \
             --runner DataflowRunner \
             --project ${PROJECT_ID} \

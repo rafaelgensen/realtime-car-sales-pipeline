@@ -54,15 +54,24 @@ def run():
             )
         )
 
-        _ = (
-            windowed
-            | "ToStr" >> beam.Map(json.dumps)
-            | "Write" >> beam.io.WriteToText(
-                file_path_prefix=f"gs://{output_bucket}/events/output",
-                file_name_suffix=".json",
-                num_shards=5
+        import os
+        is_template_build = os.environ.get("DATAFLOW_TEMPLATE_BUILD", "false") == "true"
+
+        if not is_template_build:
+            _ = (
+                windowed
+                | "ToStr" >> beam.Map(json.dumps)
+                | "Write" >> beam.io.WriteToText(
+                    file_path_prefix=f"gs://{output_bucket}/events/output",
+                    file_name_suffix=".json",
+                    num_shards=5
+                )
             )
-        )
+        else:
+            _ = (
+                windowed
+                | "NoOpSink" >> beam.Map(lambda x: None)
+            )
 
 
 if __name__ == "__main__":
