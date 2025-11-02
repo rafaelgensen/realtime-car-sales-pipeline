@@ -53,6 +53,23 @@ jobs:
           gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
           gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
 
+      ## recreate config.json and upload before template build
+      - if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
+
+          gsutil mkdir gs://${BUCKET}/config || true
+
+          cat <<EOF > config.json
+          {
+            "input_topic": "cars-sales-${PROJECT_ID}-prod-events-sub",
+            "output_bucket": "cars-sales-${PROJECT_ID}-prod-events-staging"
+          }
+          EOF
+
+          gsutil cp config.json gs://${BUCKET}/config/input_output_config.json
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -61,7 +78,7 @@ jobs:
           pip install "apache-beam[gcp]==2.54.0"
           pip install google-cloud-storage
 
-      # Build do template Dataflow (rodar só build, não pipeline)
+      ## build template only, not running pipeline here
       - if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
