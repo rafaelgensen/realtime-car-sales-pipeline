@@ -60,25 +60,21 @@ def run():
             )
         )
 
-        # Runtime: write
-        (
-            events
-            | "WriteToGCS"
-            >> beam.io.WriteToText(
-                file_path_prefix=f"gs://{output_bucket}/events/output",
-                file_name_suffix=".json",
-                num_shards=1,
+        # runtime → escreve
+        if not RuntimeValueProvider.is_initialized() or not custom.template_mode:
+            (
+                events
+                | "ToStr" >> beam.Map(json.dumps)
+                | "WriteToGCS"
+                >> beam.io.WriteToText(
+                    file_path_prefix=f"gs://{output_bucket}/events/output",
+                    file_name_suffix=".json",
+                    num_shards=1
+                )
             )
-            .only_if(custom.template_mode == False)
-        )
-
-        # Template build: no-op
-        (
-            events
-            | "TemplateNoOp"
-            >> beam.FlatMap(lambda x: [])
-            .only_if(custom.template_mode == True)
-        )
+        else:
+            # template build → no-op
+            _ = events | "TemplateNoOp" >> beam.FlatMap(lambda x: [])
 
 
 if __name__ == "__main__":
