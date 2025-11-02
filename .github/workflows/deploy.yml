@@ -58,13 +58,14 @@ jobs:
       - name: Criar bucket de template se não existir
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          REGION=us-central1
           ENV=prod
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
           
           echo "Verificando se o bucket ${BUCKET} existe..."
-          if ! gsutil ls -b gs://${BUCKET}; then
+          if ! gsutil ls -b gs://${BUCKET} >/dev/null 2>&1; then
             echo "Bucket não encontrado. Criando o bucket ${BUCKET}..."
-            gsutil mb -l ${TF_VAR_region} gs://${BUCKET}
+            gsutil mb -l ${REGION} gs://${BUCKET}
           else
             echo "Bucket ${BUCKET} já existe."
           fi
@@ -80,6 +81,23 @@ jobs:
           echo "📦 Enviando scripts Python para gs://${BUCKET}/template/"
           gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
           gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
+
+      # Gerar o template do Dataflow
+      - name: Gerar template do Dataflow
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          ENV=prod
+          REGION=us-central1
+          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+
+          echo "🏗️ Gerando template do Dataflow..."
+          python3 dataflow/main.py \
+            --runner DataflowRunner \
+            --project ${PROJECT_ID} \
+            --region ${REGION} \
+            --temp_location gs://${BUCKET}/temp \
+            --template_location gs://${BUCKET}/template/main-template
 
       - name: Terraform Init
         working-directory: ./infra
