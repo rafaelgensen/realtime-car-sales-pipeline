@@ -27,8 +27,7 @@ module "dataflow_iam" {
   region         = var.region
 
   depends_on = [
-    module.pubsub,
-    module.gcs
+    module.pubsub
   ]
 }
 
