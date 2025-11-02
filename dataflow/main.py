@@ -4,7 +4,6 @@ from apache_beam.options.pipeline_options import PipelineOptions, StandardOption
 from apache_beam.options.value_provider import RuntimeValueProvider
 from google.cloud import storage
 import google.auth
-
 from utils.transforms import process_event
 
 
@@ -24,8 +23,8 @@ def load_config():
     bucket = f"cars-sales-{project_id}-prod-dataflow-temp"
     blob = "config/input_output_config.json"
     client = storage.Client(credentials=credentials, project=project_id)
-    data = client.bucket(bucket).blob(blob).download_as_text()
-    return json.loads(data), project_id
+    text = client.bucket(bucket).blob(blob).download_as_text()
+    return json.loads(text), project_id
 
 
 def run():
@@ -50,8 +49,8 @@ def run():
             p
             | "Read" >> beam.io.ReadFromPubSub(subscription=input_sub)
             | "Decode" >> beam.Map(lambda x: x.decode("utf-8"))
-            | "Parse" >> beam.Map(json.loads)
-            | "Process" >> beam.Map(process_event)
+            | "Parse JSON" >> beam.Map(json.loads)
+            | "Process event" >> beam.Map(process_event)
             | "Filter valid" >> beam.Filter(lambda e: e is not None)
             | "Window10s" >> beam.WindowInto(
                 beam.window.FixedWindows(10),
@@ -61,11 +60,11 @@ def run():
         )
 
         # runtime → escreve
-        if not RuntimeValueProvider.is_initialized() or not custom.template_mode:
+        if not custom.template_mode:  # simples
             (
                 events
-                | "ToStr" >> beam.Map(json.dumps)
-                | "WriteToGCS"
+                | "To JSON string" >> beam.Map(json.dumps)
+                | "Write to GCS"
                 >> beam.io.WriteToText(
                     file_path_prefix=f"gs://{output_bucket}/events/output",
                     file_name_suffix=".json",
@@ -74,7 +73,7 @@ def run():
             )
         else:
             # template build → no-op
-            _ = events | "TemplateNoOp" >> beam.FlatMap(lambda x: [])
+            _ = events | "No-op for template" >> beam.FlatMap(lambda _: [])
 
 
 if __name__ == "__main__":
