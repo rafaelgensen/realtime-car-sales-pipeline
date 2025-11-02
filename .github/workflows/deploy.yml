@@ -82,6 +82,11 @@ jobs:
           gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
           gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
 
+      - name: Instalar dependências Python do Dataflow
+        run: |
+          pip install apache-beam[gcp]==2.53.0
+          pip install google-cloud-storage
+
       # Gerar o template do Dataflow
       - name: Gerar template do Dataflow
         if: ${{ github.event.inputs.destroy != 'true' }}
