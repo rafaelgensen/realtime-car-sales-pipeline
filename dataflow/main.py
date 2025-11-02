@@ -1,35 +1,16 @@
 import json
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, SetupOptions
-from google.cloud import storage
-import google.auth
 
-
-class CustomOptions(PipelineOptions):
-    @classmethod
-    def _add_argparse_args(cls, parser):
-        parser.add_value_provider_argument(
-            "--mode",
-            type=str,
-            default="run",
-            help="template or run"
-        )
-
-
-def load_config_from_gcs():
-    credentials, project_id = google.auth.default()
-    bucket_name = f"cars-sales-{project_id}-prod-dataflow-temp"
-    blob_name = "config/input_output_config.json"
-    client = storage.Client(credentials=credentials, project=project_id)
-    text = client.bucket(bucket_name).blob(blob_name).download_as_text()
-    return json.loads(text), project_id
-
+def process_event(e):
+    # mantém tua lógica se tiver, aqui só passthrough
+    return e
 
 def run():
-    config, project_id = load_config_from_gcs()
-
-    input_subscription = f"projects/{project_id}/subscriptions/{config['input_topic']}"
-    output_bucket = config["output_bucket"]
+    # hardcode total para teste
+    project_id = "vaulted-acolyte-462921-v2"
+    input_subscription = "projects/vaulted-acolyte-462921-v2/subscriptions/cars-sales-vaulted-acolyte-462921-v2-prod-events-sub"
+    output_bucket = "cars-sales-vaulted-acolyte-462921-v2-prod-events-staging"
 
     options = PipelineOptions(
         project=project_id,
@@ -40,9 +21,6 @@ def run():
     )
     options.view_as(StandardOptions).streaming = True
     options.view_as(SetupOptions).save_main_session = True
-
-    custom = options.view_as(CustomOptions)
-    from utils.transforms import process_event
 
     with beam.Pipeline(options=options) as p:
         events = (
@@ -55,29 +33,20 @@ def run():
         )
 
         windowed = events | beam.WindowInto(
-            beam.window.FixedWindows(10),
-            trigger=beam.trigger.AfterProcessingTime(5),
+            beam.window.FixedWindows(5),
+            trigger=beam.trigger.AfterProcessingTime(2),
             accumulation_mode=beam.trigger.AccumulationMode.DISCARDING
         )
 
-        mode = custom.mode
-
-        def is_template():
-            return mode.is_accessible() and mode.get() == "template"
-
-        if is_template():
-            _ = windowed | "NoOp" >> beam.Map(lambda _: None)
-        else:
-            (
-                windowed
-                | "ToJson" >> beam.Map(json.dumps)
-                | "Write" >> beam.io.WriteToText(
-                    file_path_prefix=f"gs://{output_bucket}/events/output",
-                    file_name_suffix=".json",
-                    num_shards=5
-                )
+        (
+            windowed
+            | "ToJson" >> beam.Map(json.dumps)
+            | "Write" >> beam.io.WriteToText(
+                file_path_prefix=f"gs://{output_bucket}/events/output",
+                file_name_suffix=".json",
+                num_shards=1
             )
-
+        )
 
 if __name__ == "__main__":
     run()
