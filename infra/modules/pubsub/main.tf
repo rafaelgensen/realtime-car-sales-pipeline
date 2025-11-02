@@ -17,3 +17,8 @@ output "events_subscription" {
   value = google_pubsub_subscription.events_sub.name
 }
 
+resource "google_pubsub_topic_iam_member" "dataflow_pubsub" {
+  topic  = google_pubsub_topic.events.name  
+  role   = "roles/pubsub.subscriber"        
+  member = "serviceAccount:terraform-runner@${var.project_id}.iam.gserviceaccount.com"  # Conta do Dataflow
+}

@@ -10,8 +10,3 @@ resource "google_storage_bucket_iam_member" "dataflow_staging" {
   member = "serviceAccount:terraform-runner@${var.project_id}.iam.gserviceaccount.com"
 }
 
-resource "google_pubsub_topic_iam_member" "dataflow_pubsub" {
-  topic  = module.dataflow_iam.events_topic  
-  role   = "roles/pubsub.subscriber"
-  member = "serviceAccount:terraform-runner@${var.project_id}.iam.gserviceaccount.com"
-}
