@@ -12,8 +12,8 @@ module "pubsub" {
 }
 
 # Módulo para GCS
-module "gcs" {
-  source     = "./modules/gcs"
+module "bq" {
+  source     = "./modules/bigquery"
   project_id = var.project_id
   env        = var.env
   region     = var.region
@@ -27,8 +27,7 @@ module "dataflow_iam" {
   region         = var.region
 
   depends_on = [
-    module.pubsub,
-    module.gcs
+    module.pubsub
   ]
 }
 

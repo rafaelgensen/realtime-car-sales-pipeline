@@ -2,127 +2,82 @@ name: Deploy GCP Streaming Infra
 
 on:
   pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-
+    branches: [main]
+    types: [opened, synchronize]
   workflow_dispatch:
     inputs:
       destroy:
-        description: "Deseja destruir os recursos?"
+        description: "Destroy resources?"
         required: true
         default: "false"
         type: choice
-        options:
-          - "false"
-          - "true"
+        options: ["false", "true"]
 
 jobs:
   terraform:
-    name: Terraform Deploy or Destroy - Capabilities
     runs-on: ubuntu-latest
-
     if: startsWith(github.head_ref || github.ref_name, 'prod/') || github.event_name == 'workflow_dispatch'
 
     steps:
-      - name: Checkout código
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Configurar credenciais GCP
-        id: auth
+      - id: auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
 
-      - name: Configurar projeto GCP
-        uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           install_components: 'beta'
 
-      - name: Exportar variáveis Terraform
-        run: |
+      - run: |
           echo "TF_VAR_project_id=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}" >> $GITHUB_ENV
           echo "TF_VAR_region=us-central1" >> $GITHUB_ENV
           echo "TF_VAR_env=prod" >> $GITHUB_ENV
-          echo "TF_VAR_account_id=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}" >> $GITHUB_ENV
 
-      - name: Instalar Terraform
-        uses: hashicorp/setup-terraform@v2
+      - uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.7
 
-      - name: Criar bucket de template se não existir
+      # Create Dataflow temp bucket if not exists
+      - run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
+          gsutil ls -b gs://${BUCKET} >/dev/null 2>&1 || gsutil mb -l us-central1 gs://${BUCKET}
+
+      # Upload only simplified main.py
+      - if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
-          REGION=us-central1
-          ENV=prod
-          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
-          gsutil ls -b gs://${BUCKET} >/dev/null 2>&1 || gsutil mb -l ${REGION} gs://${BUCKET}
+          BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
+          gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/main.py
 
-      - name: Upload dos scripts Dataflow (.py)
-        if: ${{ github.event.inputs.destroy != 'true' }}
-        run: |
-          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
-          ENV=prod
-          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
-          gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
-          gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
-
-      - name: Upload config input_output_config.json
-        if: ${{ github.event.inputs.destroy != 'true' }}
-        run: |
-          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
-          ENV=prod
-          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
-
-          echo '{
-            "input_topic": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-sub",
-            "output_bucket": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-staging"
-          }' > config.json
-
-          gsutil cp config.json gs://${BUCKET}/config/input_output_config.json
-
-      - name: Set Python 3.10
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Instalar dependências Python
-        run: |
-          pip install apache-beam[gcp]==2.53.0
-          pip install google-cloud-storage
+      - run: |
+          pip install "apache-beam[gcp]==2.54.0"
 
-      - name: Gerar template Dataflow
-        if: ${{ github.event.inputs.destroy != 'true' }}
+      # Build Dataflow template (no streaming flag here)
+      - if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
-          ENV=prod
-          REGION=us-central1
-          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
-
-          # Build template mode ON
-          export DATAFLOW_TEMPLATE_BUILD=true
+          BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
 
           python3 dataflow/main.py \
             --runner DataflowRunner \
             --project ${PROJECT_ID} \
-            --region ${REGION} \
+            --region us-central1 \
             --temp_location gs://${BUCKET}/temp \
-            --template_location gs://${BUCKET}/template/main-template \
-            --setup_file ./dataflow/setup.py
+            --template_location gs://${BUCKET}/template/main-template
 
-          # Turn off after template build
-          unset DATAFLOW_TEMPLATE_BUILD
-
-      - name: Terraform Init
-        working-directory: ./infra
+      # Terraform apply or destroy
+      - working-directory: ./infra
         run: terraform init
 
-      - name: Terraform Apply ou Destroy
-        working-directory: ./infra
+      - working-directory: ./infra
         run: |
           if [ "${{ github.event.inputs.destroy }}" == "true" ]; then
             terraform destroy -auto-approve
