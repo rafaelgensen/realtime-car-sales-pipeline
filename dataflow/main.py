@@ -1,7 +1,6 @@
 import json
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, SetupOptions
-from apache_beam.io import fileio
 
 PROJECT_ID = "vaulted-acolyte-462921-v2"
 INPUT_SUB = f"projects/{PROJECT_ID}/subscriptions/cars-sales-{PROJECT_ID}-prod-events-sub"
@@ -49,24 +48,18 @@ def run():
             accumulation_mode=beam.trigger.AccumulationMode.DISCARDING
         )
 
-        def is_template():
-            return custom.mode.is_accessible() and custom.mode.get() == "template"
-
-        if is_template():
+        if custom.mode.is_accessible() and custom.mode.get() == "template":
             _ = windowed | "NoOp" >> beam.Map(lambda _: None)
         else:
             (
                 windowed
                 | "ToJson" >> beam.Map(json.dumps)
-                | "PairWithDummyKey" >> beam.Map(lambda x: ("unused", x))
-                | "WriteFiles" >> fileio.WriteToFiles(
-                    path=f"gs://{OUTPUT_BUCKET}/events/",
-                    file_naming=fileio.destination_prefix_naming(
-                        prefix_fn=lambda dest: "output",
-                        suffix=".json"
-                    ),
-                    sink=lambda dest: fileio.TextSink()
-                )
+                | "WriteText" >> beam.io.WriteToText(
+                    file_path_prefix=f"gs://{OUTPUT_BUCKET}/events/output",
+                    file_name_suffix=".json",
+                    num_shards=5,
+                    shard_name_template="-SSSSS-of-NNNNN",
+                ).with_windowed_writes()
             )
 
 
