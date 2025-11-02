@@ -6,16 +6,6 @@ PROJECT_ID = "vaulted-acolyte-462921-v2"
 INPUT_SUB = f"projects/{PROJECT_ID}/subscriptions/cars-sales-{PROJECT_ID}-prod-events-sub"
 OUTPUT_PATH = f"gs://cars-sales-{PROJECT_ID}-prod-events-staging/events/output"
 
-class CustomOptions(PipelineOptions):
-    @classmethod
-    def _add_argparse_args(cls, parser):
-        parser.add_value_provider_argument(
-            "--mode",
-            type=str,
-            default="run",
-            help="template or run"
-        )
-
 def run():
     options = PipelineOptions(
         project=PROJECT_ID,
@@ -26,7 +16,6 @@ def run():
     )
     options.view_as(StandardOptions).streaming = True
     options.view_as(SetupOptions).save_main_session = True
-    custom = options.view_as(CustomOptions)
 
     from utils.transforms import process_event
 
@@ -43,27 +32,20 @@ def run():
         windowed = events | "Window" >> beam.WindowInto(
             beam.window.FixedWindows(10),
             trigger=beam.trigger.AfterProcessingTime(5),
-            accumulation_mode=beam.trigger.AccumulationMode.DISCARDING
+            accumulation_mode=beam.trigger.AccumulationMode.DISCARDING,
         )
 
-        def is_template():
-            try:
-                return custom.mode.is_accessible() and custom.mode.get() == "template"
-            except:
-                return True  # fallback default for build phase
-
-        if is_template():
-            _ = windowed | "NoOp" >> beam.Map(lambda _: None)
-        else:
-            (
-                windowed
-                | "ToJson" >> beam.Map(json.dumps)
-                | "Write" >> beam.io.WriteToText(
-                    file_path_prefix=OUTPUT_PATH,
-                    file_name_suffix=".json",
-                    num_shards=5
-                )
+        (
+            windowed
+            | "ToJson" >> beam.Map(json.dumps)
+            | "Write" >> beam.io.WriteToText(
+                file_path_prefix=OUTPUT_PATH,
+                file_name_suffix=".json",
+                num_shards=5,
+                # chave: habilita escrita para coleções não delimitadas com janelas
+                windowed_writes=True,
             )
+        )
 
 if __name__ == "__main__":
     run()
