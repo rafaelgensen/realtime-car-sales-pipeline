@@ -113,9 +113,10 @@ jobs:
             --temp_location gs://${BUCKET}/temp \
             --template_location gs://${BUCKET}/template/main-template \
             --setup_file ./dataflow/setup.py
-
-          # Turn off after template build
-          unset DATAFLOW_TEMPLATE_BUILD
+      
+      # Turn off after template build
+      - name: Clear Template  
+        run: unset DATAFLOW_TEMPLATE_BUILD
 
       - name: Terraform Init
         working-directory: ./infra
