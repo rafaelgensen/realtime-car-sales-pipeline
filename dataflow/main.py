@@ -7,6 +7,7 @@ PROJECT_ID = "vaulted-acolyte-462921-v2"
 INPUT_SUB = f"projects/{PROJECT_ID}/subscriptions/cars-sales-{PROJECT_ID}-prod-events-sub"
 OUTPUT_BUCKET = f"cars-sales-{PROJECT_ID}-prod-events-staging"
 
+
 class CustomOptions(PipelineOptions):
     @classmethod
     def _add_argparse_args(cls, parser):
@@ -16,6 +17,7 @@ class CustomOptions(PipelineOptions):
             default="run",
             help="template or run"
         )
+
 
 def run():
     options = PipelineOptions(
@@ -56,17 +58,17 @@ def run():
             (
                 windowed
                 | "ToJson" >> beam.Map(json.dumps)
-                | "PairWithKey" >> beam.Map(lambda x: ("", x))
+                | "PairWithDummyKey" >> beam.Map(lambda x: ("unused", x))
                 | "WriteFiles" >> fileio.WriteToFiles(
                     path=f"gs://{OUTPUT_BUCKET}/events/",
-                    destination=lambda record, **_: "data",  # nome fixo
                     file_naming=fileio.destination_prefix_naming(
-                        prefix="output",
+                        prefix_fn=lambda dest: "output",
                         suffix=".json"
                     ),
                     sink=lambda dest: fileio.TextSink()
                 )
             )
+
 
 if __name__ == "__main__":
     run()
