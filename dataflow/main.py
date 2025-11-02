@@ -1,4 +1,3 @@
-import json
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, SetupOptions
 
@@ -23,10 +22,12 @@ def run():
             | "ReadPubSub" >> beam.io.ReadFromPubSub(subscription=SUBSCRIPTION)
             | "Decode" >> beam.Map(lambda x: x.decode("utf-8"))
 
-            # janela obrigatória no streaming + WriteToText
-            | "Window" >> beam.WindowInto(beam.window.FixedWindows(10))
+            # janela obrigatória no streaming com WriteToText
+            | "Window10s" >> beam.WindowInto(
+                beam.window.FixedWindows(10)
+            )
 
-            | "WriteGCS" >> beam.io.WriteToText(
+            | "WriteToGCS" >> beam.io.WriteToText(
                 file_path_prefix=OUTPUT_PREFIX,
                 file_name_suffix=".json",
                 num_shards=1
