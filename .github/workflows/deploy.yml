@@ -61,20 +61,7 @@ jobs:
           pip install "apache-beam[gcp]==2.54.0"
           pip install google-cloud-storage
 
-      - if: ${{ github.event.inputs.destroy != 'true' }}
-        run: |
-          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
-          BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
-
-          python3 dataflow/main.py \
-            --runner DataflowRunner \
-            --project ${PROJECT_ID} \
-            --region us-central1 \
-            --temp_location gs://${BUCKET}/temp \
-            --template_location gs://${BUCKET}/template/main-template \
-            --template_mode true \
-            --setup_file ./dataflow/setup.py \
-            --no_use_per_job_packages
+      # Step de build do template removido
 
       - working-directory: ./infra
         run: terraform init
