@@ -1,10 +1,21 @@
 import json
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, SetupOptions
+from apache_beam.io import fileio
 
 PROJECT_ID = "vaulted-acolyte-462921-v2"
 INPUT_SUB = f"projects/{PROJECT_ID}/subscriptions/cars-sales-{PROJECT_ID}-prod-events-sub"
 OUTPUT_BUCKET = f"cars-sales-{PROJECT_ID}-prod-events-staging"
+
+class CustomOptions(PipelineOptions):
+    @classmethod
+    def _add_argparse_args(cls, parser):
+        parser.add_value_provider_argument(
+            "--mode",
+            type=str,
+            default="run",
+            help="template or run"
+        )
 
 def run():
     options = PipelineOptions(
@@ -16,6 +27,7 @@ def run():
     )
     options.view_as(StandardOptions).streaming = True
     options.view_as(SetupOptions).save_main_session = True
+    custom = options.view_as(CustomOptions)
 
     from utils.transforms import process_event
 
@@ -35,18 +47,23 @@ def run():
             accumulation_mode=beam.trigger.AccumulationMode.DISCARDING
         )
 
-        # Write to GCS manually per-window
-        (
-            windowed
-            | "ToJson" >> beam.Map(json.dumps)
-            | "WriteFiles" >> beam.io.fileio.WriteToFiles(
-                path_prefix=f"gs://{OUTPUT_BUCKET}/events/output",
-                file_naming=beam.io.fileio.destination_prefix_naming(),
-                destination=lambda _: "",
-                shards=5,
-                sink=lambda: beam.io.fileio.TextSink()
+        def is_template():
+            return custom.mode.is_accessible() and custom.mode.get() == "template"
+
+        if is_template():
+            _ = windowed | "NoOp" >> beam.Map(lambda _: None)
+        else:
+            (
+                windowed
+                | "ToJson" >> beam.Map(json.dumps)
+                | "WriteFiles" >> fileio.WriteToFiles(
+                    path_prefix=f"gs://{OUTPUT_BUCKET}/events/output",
+                    file_naming=fileio.destination_prefix_naming(),
+                    destination=lambda _: "",
+                    shards=5,
+                    sink=lambda: fileio.TextSink()
+                )
             )
-        )
 
 if __name__ == "__main__":
     run()
