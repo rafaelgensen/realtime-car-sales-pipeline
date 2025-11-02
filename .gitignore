@@ -1,3 +1,5 @@
 tests/credentials/
 tests/credentials/*
-!tests/credentials/.gitkeep
+
+tests/
+tests/*
