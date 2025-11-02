@@ -4,8 +4,4 @@ resource "google_dataflow_job" "streaming" {
   temp_gcs_location = "gs://cars-sales-${var.project_id}-${var.env}-dataflow-temp/temp"
   region            = var.region
   on_delete         = "cancel"
-
-  parameters = {
-    mode = "run"
-  }
 }
