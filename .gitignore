@@ -1,2 +1,3 @@
-./teste/*
-/teste
+./tests/credentials
+
+./tests/credentials/*
