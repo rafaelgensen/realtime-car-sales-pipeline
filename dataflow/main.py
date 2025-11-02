@@ -3,7 +3,6 @@ import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, SetupOptions
 from google.cloud import storage
 import google.auth
-from datetime import datetime
 
 
 class CustomOptions(PipelineOptions):
@@ -11,8 +10,7 @@ class CustomOptions(PipelineOptions):
     def _add_argparse_args(cls, parser):
         parser.add_value_provider_argument(
             "--template_mode",
-            type=bool,
-            default=False,
+            default="false",
             help="True when building template"
         )
 
@@ -64,8 +62,10 @@ def run():
             )
         )
 
-        # runtime only
-        if custom.template_mode.is_accessible() and not custom.template_mode.get():
+        template_flag = custom.template_mode.get().lower() == "true" \
+            if custom.template_mode.is_accessible() else False
+
+        if not template_flag:
             (
                 windowed
                 | "ToJson" >> beam.Map(json.dumps)
