@@ -54,6 +54,33 @@ jobs:
         with:
           terraform_version: 1.5.7
 
+      # Criar o bucket de template se não existir
+      - name: Criar bucket de template se não existir
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          ENV=prod
+          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+          
+          echo "Verificando se o bucket ${BUCKET} existe..."
+          if ! gsutil ls -b gs://${BUCKET}; then
+            echo "Bucket não encontrado. Criando o bucket ${BUCKET}..."
+            gsutil mb -l ${TF_VAR_region} gs://${BUCKET}
+          else
+            echo "Bucket ${BUCKET} já existe."
+          fi
+
+      # Upload dos scripts Python para o bucket template do Dataflow
+      - name: Upload dos scripts Dataflow (.py) para o bucket template
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          ENV=prod
+          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+
+          echo "📦 Enviando scripts Python para gs://${BUCKET}/template/"
+          gsutil -m cp ./Dataflow/main.py gs://${BUCKET}/template/
+          gsutil -m cp -r ./Dataflow/utils gs://${BUCKET}/template/utils
+
       - name: Terraform Init
         working-directory: ./infra
         run: terraform init
@@ -68,15 +95,3 @@ jobs:
             echo "🚀 Aplicando infraestrutura GCP..."
             terraform apply -auto-approve
           fi
-
-      # === Upload dos scripts Python para a pasta template/ esperada pelo Dataflow ===
-      - name: Upload dos scripts Dataflow (.py) para o bucket template
-        if: ${{ github.event.inputs.destroy != 'true' }}
-        run: |
-          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
-          ENV=prod
-          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
-
-          echo "📦 Enviando scripts Python para gs://${BUCKET}/template/"
-          gsutil -m cp ./Dataflow/main.py gs://${BUCKET}/template/
-          gsutil -m cp -r ./Dataflow/utils gs://${BUCKET}/template/utils
