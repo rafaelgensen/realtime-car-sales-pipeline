@@ -4,7 +4,6 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize]
-
   workflow_dispatch:
     inputs:
       destroy:
@@ -30,7 +29,7 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
-          install_components: "beta"
+          install_components: 'beta'
 
       - run: |
           echo "TF_VAR_project_id=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}" >> $GITHUB_ENV
@@ -58,17 +57,19 @@ jobs:
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
           gsutil mkdir gs://${BUCKET}/config || true
+
           cat <<EOF > config.json
           {
             "input_topic": "cars-sales-${PROJECT_ID}-prod-events-sub",
             "output_bucket": "cars-sales-${PROJECT_ID}-prod-events-staging"
           }
           EOF
+
           gsutil cp config.json gs://${BUCKET}/config/input_output_config.json
 
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: '3.10'
 
       - run: |
           pip install "apache-beam[gcp]==2.54.0"
@@ -78,12 +79,14 @@ jobs:
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
+
           python3 dataflow/main.py \
             --runner DataflowRunner \
             --project ${PROJECT_ID} \
             --region us-central1 \
             --temp_location gs://${BUCKET}/temp \
             --template_location gs://${BUCKET}/template/main-template \
+            --mode template \
             --setup_file ./dataflow/setup.py \
             --no_use_per_job_packages
 
