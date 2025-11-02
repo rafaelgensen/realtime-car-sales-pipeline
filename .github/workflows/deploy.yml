@@ -40,12 +40,13 @@ jobs:
         with:
           terraform_version: 1.5.7
 
+      # Create Dataflow temp bucket if not exists
       - run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
           gsutil ls -b gs://${BUCKET} >/dev/null 2>&1 || gsutil mb -l us-central1 gs://${BUCKET}
 
-      # publica apenas o main.py simplificado
+      # Upload only simplified main.py
       - if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
@@ -59,7 +60,7 @@ jobs:
       - run: |
           pip install "apache-beam[gcp]==2.54.0"
 
-      # build do template a partir do main.py simples
+      # Build Dataflow template (no streaming flag here)
       - if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
@@ -72,6 +73,7 @@ jobs:
             --temp_location gs://${BUCKET}/temp \
             --template_location gs://${BUCKET}/template/main-template
 
+      # Terraform apply or destroy
       - working-directory: ./infra
         run: terraform init
 

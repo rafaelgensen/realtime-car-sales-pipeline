@@ -1,3 +1,4 @@
+import json
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, SetupOptions
 
@@ -10,10 +11,9 @@ def run():
         project=PROJECT_ID,
         region="us-central1",
         runner="DataflowRunner",
-        temp_location=f"gs://cars-sales-{PROJECT_ID}-prod-dataflow-temp/temp",
-        streaming=True,
+        temp_location=f"gs://cars-sales-{PROJECT_ID}-prod-dataflow-temp/temp"
     )
-    options.view_as(StandardOptions).streaming = True
+
     options.view_as(SetupOptions).save_main_session = True
 
     with beam.Pipeline(options=options) as p:
@@ -21,13 +21,7 @@ def run():
             p
             | "ReadPubSub" >> beam.io.ReadFromPubSub(subscription=SUBSCRIPTION)
             | "Decode" >> beam.Map(lambda x: x.decode("utf-8"))
-
-            # janela obrigatória no streaming com WriteToText
-            | "Window10s" >> beam.WindowInto(
-                beam.window.FixedWindows(10)
-            )
-
-            | "WriteToGCS" >> beam.io.WriteToText(
+            | "WriteGCS" >> beam.io.WriteToText(
                 file_path_prefix=OUTPUT_PREFIX,
                 file_name_suffix=".json",
                 num_shards=1
