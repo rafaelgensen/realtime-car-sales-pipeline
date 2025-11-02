@@ -106,7 +106,7 @@ jobs:
           --region ${REGION} \
           --temp_location gs://${BUCKET}/temp \
           --template_location gs://${BUCKET}/template/main-template \
-          --template=true \
+          --template_mode true \
           --setup_file ./dataflow/setup.py
 
       - name: Terraform Init
