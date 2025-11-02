@@ -56,12 +56,11 @@ def run():
 
         _ = (
             windowed
-            | "ToStr" >> beam.Map(lambda e: json.dumps(e))
-            | "Write" >> beam.io.fileio.WriteToFiles(
-                path=f"gs://{output_bucket}/events/",
-                file_naming=beam.io.fileio.destination_prefix_naming("part"),
-                destination=lambda x: "",  # single destination
-                max_records_per_file=2000  # ~streaming friendly
+            | "ToStr" >> beam.Map(json.dumps)
+            | "Write" >> beam.io.WriteToText(
+                file_path_prefix=f"gs://{output_bucket}/events/output",
+                file_name_suffix=".json",
+                num_shards=5
             )
         )
 
