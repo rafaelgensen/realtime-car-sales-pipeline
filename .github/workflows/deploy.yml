@@ -67,11 +67,14 @@ jobs:
           BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
 
           python3 dataflow/main.py \
+            --runner DataflowRunner \
             --project ${PROJECT_ID} \
             --region us-central1 \
             --temp_location gs://${BUCKET}/temp \
             --template_location gs://${BUCKET}/template/main-template \
-            --setup_file ./dataflow/setup.py
+            --template_mode true \
+            --setup_file ./dataflow/setup.py \
+            --no_use_per_job_packages
 
       - working-directory: ./infra
         run: terraform init
