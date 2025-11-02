@@ -3,30 +3,26 @@ import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
 from google.cloud import storage
 import google.auth
-from datetime import datetime
 
 
 def load_config_from_gcs():
     credentials, project_id = google.auth.default()
     bucket_name = f"cars-sales-{project_id}-prod-dataflow-temp"
     blob_name = "config/input_output_config.json"
-
     client = storage.Client(credentials=credentials, project=project_id)
     content = client.bucket(bucket_name).blob(blob_name).download_as_text()
-
     return json.loads(content), project_id
 
 
 def run():
     config, project_id = load_config_from_gcs()
 
-    region = "us-central1"
     input_subscription = f"projects/{project_id}/subscriptions/{config['input_topic']}"
     output_bucket = config["output_bucket"]
 
     options = PipelineOptions(
         project=project_id,
-        region=region,
+        region="us-central1",
         temp_location=f"gs://cars-sales-{project_id}-prod-dataflow-temp/temp/",
         runner="DataflowRunner",
         streaming=True,
@@ -49,20 +45,19 @@ def run():
             | "Filter invalid" >> beam.Filter(lambda e: e is not None)
         )
 
-        # janela de 1 minuto para poder escrever streaming
         windowed = (
             processed
-            | "Window 1m" >> beam.WindowInto(
+            | "Window10s" >> beam.WindowInto(
                 beam.window.FixedWindows(10),
-                trigger=beam.trigger.AfterProcessingTime(10),
+                trigger=beam.trigger.AfterProcessingTime(5),
                 accumulation_mode=beam.trigger.AccumulationMode.DISCARDING
             )
         )
 
         (
             windowed
-            | "To str" >> beam.Map(lambda e: json.dumps(e))
-            | "Write GCS" >> beam.io.WriteToText(
+            | "ToStr" >> beam.Map(lambda e: json.dumps(e))
+            | "Write" >> beam.io.WriteToText(
                 f"gs://{output_bucket}/events",
                 file_name_suffix=".json",
                 shard_name_template="-SSSSS"
