@@ -19,7 +19,6 @@ on:
           - "false"
           - "true"
 
-
 jobs:
   terraform:
     name: Terraform Deploy or Destroy - Capabilities
@@ -31,46 +30,95 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v3
 
-      # Autentica na GCP com o JSON do Service Account
       - name: Configurar credenciais GCP
         id: auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
 
-      # Configura o SDK do gcloud
       - name: Configurar projeto GCP
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           install_components: 'beta'
 
-      # Define variáveis do Terraform (usadas pelos .tf vars)
       - name: Exportar variáveis Terraform
         run: |
           echo "TF_VAR_project_id=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}" >> $GITHUB_ENV
           echo "TF_VAR_region=us-central1" >> $GITHUB_ENV
           echo "TF_VAR_env=prod" >> $GITHUB_ENV
+          echo "TF_VAR_account_id=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}" >> $GITHUB_ENV
 
-      # Instala Terraform
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.7
 
-      # Inicializa o Terraform
+      - name: Criar bucket de template se não existir
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          REGION=us-central1
+          ENV=prod
+          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+          gsutil ls -b gs://${BUCKET} >/dev/null 2>&1 || gsutil mb -l ${REGION} gs://${BUCKET}
+
+      - name: Upload dos scripts Dataflow (.py)
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          ENV=prod
+          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+          gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
+          gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
+
+      - name: Upload config input_output_config.json
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          ENV=prod
+          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+
+          echo '{
+            "input_topic": "cars-sale-'"${PROJECT_ID}"'-'"${ENV}"'-events-sub",
+            "output_bucket": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-staging"
+          }' > config.json
+
+          gsutil cp config.json gs://${BUCKET}/config/input_output_config.json
+
+      - name: Set Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Instalar dependências Python
+        run: |
+          pip install apache-beam[gcp]==2.53.0
+          pip install google-cloud-storage
+
+      - name: Gerar template Dataflow
+        if: ${{ github.event.inputs.destroy != 'true' }}
+        run: |
+          PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
+          ENV=prod
+          REGION=us-central1
+          BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+          export DATAFLOW_TEMPLATE_BUILD=true
+          python3 dataflow/main.py \
+            --runner DataflowRunner \
+            --project ${PROJECT_ID} \
+            --region ${REGION} \
+            --temp_location gs://${BUCKET}/temp \
+            --template_location gs://${BUCKET}/template/main-template
+
       - name: Terraform Init
         working-directory: ./infra
         run: terraform init
 
-      # Aplica ou destrói conforme input manual
       - name: Terraform Apply ou Destroy
         working-directory: ./infra
         run: |
           if [ "${{ github.event.inputs.destroy }}" == "true" ]; then
-            echo "⚠️ Destruindo infraestrutura GCP..."
             terraform destroy -auto-approve
           else
-            echo "🚀 Aplicando infraestrutura GCP..."
             terraform apply -auto-approve
           fi
