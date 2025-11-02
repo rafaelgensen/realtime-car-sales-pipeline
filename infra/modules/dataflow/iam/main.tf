@@ -1,6 +1,6 @@
 data "google_project" "project" {}
 
-# Dataflow service account (padrão do serviço)
+# Dataflow managed service account (orquestra o job)
 resource "google_storage_bucket_iam_member" "dataflow_temp_worker" {
   bucket = "cars-sales-${var.project_id}-${var.env}-dataflow-temp"
   role   = "roles/storage.objectAdmin"
@@ -13,7 +13,7 @@ resource "google_storage_bucket_iam_member" "dataflow_staging_worker" {
   member = "serviceAccount:service-${data.google_project.project.number}@dataflow-service-producer-prod.iam.gserviceaccount.com"
 }
 
-# Compute default SA (workers quando Dataflow cria VMs)
+# Compute default service account (workers que acessam GCS)
 resource "google_storage_bucket_iam_member" "compute_default_temp" {
   bucket = "cars-sales-${var.project_id}-${var.env}-dataflow-temp"
   role   = "roles/storage.objectAdmin"
