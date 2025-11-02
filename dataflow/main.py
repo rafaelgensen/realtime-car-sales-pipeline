@@ -10,7 +10,8 @@ class CustomOptions(PipelineOptions):
     def _add_argparse_args(cls, parser):
         parser.add_value_provider_argument(
             "--template_mode",
-            default="false",
+            type=bool,
+            default=False,
             help="True when building template"
         )
 
@@ -62,10 +63,10 @@ def run():
             )
         )
 
-        template_flag = custom.template_mode.get().lower() == "true" \
-            if custom.template_mode.is_accessible() else False
-
-        if not template_flag:
+        # template build = no write
+        if custom.template_mode.is_accessible() and custom.template_mode.get():
+            _ = windowed | "NoOpTemplate" >> beam.Map(lambda _: None)
+        else:
             (
                 windowed
                 | "ToJson" >> beam.Map(json.dumps)
@@ -75,8 +76,6 @@ def run():
                     num_shards=5
                 )
             )
-        else:
-            _ = windowed | "NoOpTemplate" >> beam.Map(lambda _: None)
 
 
 if __name__ == "__main__":

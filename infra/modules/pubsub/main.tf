@@ -24,10 +24,3 @@ resource "google_pubsub_subscription_iam_member" "compute_sub" {
   role         = "roles/pubsub.subscriber"
   member       = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
-
-# Dataflow publica (caso use Pub/Sub output)
-resource "google_pubsub_topic_iam_member" "dataflow_pub" {
-  topic  = google_pubsub_topic.events.name
-  role   = "roles/pubsub.publisher"
-  member = "serviceAccount:service-${data.google_project.project.number}@dataflow-service-producer-prod.iam.gserviceaccount.com"
-}
