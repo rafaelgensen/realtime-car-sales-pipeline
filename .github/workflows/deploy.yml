@@ -45,12 +45,12 @@ jobs:
           BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
           gsutil ls -b gs://${BUCKET} >/dev/null 2>&1 || gsutil mb -l us-central1 gs://${BUCKET}
 
+      # publica apenas o main.py simplificado
       - if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
-          gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
-          # gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
+          gsutil -m cp ./src/main.py gs://${BUCKET}/template/main.py
 
       - uses: actions/setup-python@v4
         with:
@@ -58,21 +58,19 @@ jobs:
 
       - run: |
           pip install "apache-beam[gcp]==2.54.0"
-          pip install google-cloud-storage
 
+      # build do template a partir do main.py simples
       - if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           BUCKET="cars-sales-${PROJECT_ID}-prod-dataflow-temp"
 
-          python3 dataflow/main.py \
+          python3 src/main.py \
             --runner DataflowRunner \
             --project ${PROJECT_ID} \
             --region us-central1 \
             --temp_location gs://${BUCKET}/temp \
-            --template_location gs://${BUCKET}/template/main-template \
-            --setup_file ./dataflow/setup.py \
-            --no_use_per_job_packages
+            --template_location gs://${BUCKET}/template/main-template
 
       - working-directory: ./infra
         run: terraform init
