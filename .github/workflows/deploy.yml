@@ -102,7 +102,10 @@ jobs:
           ENV=prod
           REGION=us-central1
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+
+          # Build template mode ON
           export DATAFLOW_TEMPLATE_BUILD=true
+
           python3 dataflow/main.py \
             --runner DataflowRunner \
             --project ${PROJECT_ID} \
@@ -110,6 +113,9 @@ jobs:
             --temp_location gs://${BUCKET}/temp \
             --template_location gs://${BUCKET}/template/main-template \
             --setup_file ./dataflow/setup.py
+
+          # Turn off after template build
+          unset DATAFLOW_TEMPLATE_BUILD
 
       - name: Terraform Init
         working-directory: ./infra
