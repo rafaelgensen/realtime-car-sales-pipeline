@@ -1,8 +1,6 @@
 import json
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
-from apache_beam.options.pipeline_options import SetupOptions
-from apache_beam.options.value_provider import RuntimeValueProvider
+from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, SetupOptions
 from google.cloud import storage
 import google.auth
 from datetime import datetime
@@ -66,8 +64,8 @@ def run():
             )
         )
 
-        # Runtime only: write
-        if RuntimeValueProvider.is_initialized() and not custom.template_mode.get():
+        # runtime only
+        if custom.template_mode.is_accessible() and not custom.template_mode.get():
             (
                 windowed
                 | "ToJson" >> beam.Map(json.dumps)
@@ -78,8 +76,7 @@ def run():
                 )
             )
         else:
-            # Template phase: no write
-            _ = windowed | "NoOpTemplate" >> beam.Map(lambda x: None)
+            _ = windowed | "NoOpTemplate" >> beam.Map(lambda _: None)
 
 
 if __name__ == "__main__":
