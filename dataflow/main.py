@@ -1,26 +1,24 @@
 import json
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
+from apache_beam.options.pipeline_options import SetupOptions
 from apache_beam.options.value_provider import RuntimeValueProvider
 from google.cloud import storage
 import google.auth
+from datetime import datetime
 
-# --------------------
-# Custom flag
-# --------------------
+
 class CustomOptions(PipelineOptions):
     @classmethod
     def _add_argparse_args(cls, parser):
         parser.add_value_provider_argument(
             "--template_mode",
-            default=False,  # key: default runtime = writes to GCS
             type=bool,
-            help="True only when generating Dataflow template"
+            default=False,
+            help="True when building template"
         )
 
-# --------------------
-# Config loader
-# --------------------
+
 def load_config_from_gcs():
     credentials, project_id = google.auth.default()
     bucket_name = f"cars-sales-{project_id}-prod-dataflow-temp"
@@ -29,12 +27,8 @@ def load_config_from_gcs():
     content = client.bucket(bucket_name).blob(blob_name).download_as_text()
     return json.loads(content), project_id
 
-# --------------------
-# Pipeline
-# --------------------
-def run():
-    from utils.transforms import process_event  # ensure packaged
 
+def run():
     config, project_id = load_config_from_gcs()
 
     input_subscription = f"projects/{project_id}/subscriptions/{config['input_topic']}"
@@ -48,59 +42,45 @@ def run():
         streaming=True,
     )
     options.view_as(StandardOptions).streaming = True
+    options.view_as(SetupOptions).save_main_session = True
     custom = options.view_as(CustomOptions)
+
+    from utils.transforms import process_event
 
     with beam.Pipeline(options=options) as p:
         events = (
             p
-            | "Read PubSub" >> beam.io.ReadFromPubSub(subscription=input_subscription)
+            | "Read" >> beam.io.ReadFromPubSub(subscription=input_subscription)
             | "Decode" >> beam.Map(lambda x: x.decode("utf-8"))
-            | "Parse JSON" >> beam.Map(json.loads)
-        )
-
-        processed = (
-            events
-            | "Process event" >> beam.Map(process_event)
-            | "Filter valid" >> beam.Filter(lambda e: e is not None)
+            | "Parse" >> beam.Map(json.loads)
+            | "Process" >> beam.Map(process_event)
+            | "FilterValid" >> beam.Filter(lambda e: e is not None)
         )
 
         windowed = (
-            processed
-            | "Window10s" >> beam.WindowInto(
+            events
+            | beam.WindowInto(
                 beam.window.FixedWindows(10),
                 trigger=beam.trigger.AfterProcessingTime(5),
                 accumulation_mode=beam.trigger.AccumulationMode.DISCARDING
             )
         )
 
-        # --------------------
-        # RUNTIME output (template_mode = false)
-        # --------------------
-        runtime_branch = (
-            windowed
-            | "To JSON string" >> beam.Map(json.dumps)
-        )
-
-        # Runtime write branch guarded by template flag
-        (
-            runtime_branch
-            | "Write To GCS" >> beam.io.WriteToText(
-                file_path_prefix=f"gs://{output_bucket}/events/output",
-                file_name_suffix=".json",
-                num_shards=3
+        # Runtime only: write
+        if RuntimeValueProvider.is_initialized() and not custom.template_mode.get():
+            (
+                windowed
+                | "ToJson" >> beam.Map(json.dumps)
+                | "Write" >> beam.io.WriteToText(
+                    file_path_prefix=f"gs://{output_bucket}/events/output",
+                    file_name_suffix=".json",
+                    num_shards=5
+                )
             )
-        ).only_if(custom.template_mode == False)
+        else:
+            # Template phase: no write
+            _ = windowed | "NoOpTemplate" >> beam.Map(lambda x: None)
 
-        # --------------------
-        # TEMPLATE build branch (no output)
-        # --------------------
-        (
-            windowed
-            | "No-op for template" >> beam.FlatMap(lambda _: [])
-        ).only_if(custom.template_mode == True)
 
-# --------------------
-# Entry
-# --------------------
 if __name__ == "__main__":
     run()
