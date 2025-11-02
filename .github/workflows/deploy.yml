@@ -79,7 +79,7 @@ jobs:
 
           echo "📦 Enviando scripts Python para gs://${BUCKET}/template/"
           gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
-          gsutil -m cp -r ./Dataflow/utils gs://${BUCKET}/template/utils
+          gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
 
       - name: Terraform Init
         working-directory: ./infra
