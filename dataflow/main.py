@@ -3,21 +3,16 @@ import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
 from google.cloud import storage
 import google.auth
+from datetime import datetime
 
 
 def load_config_from_gcs():
-    """Lê o JSON de configuração do bucket Terraform."""
-    # Descobre o projeto e as credenciais atuais
     credentials, project_id = google.auth.default()
-
-    # Bucket criado via Terraform (mesmo nome usado no resource)
     bucket_name = f"cars-sales-{project_id}-prod-dataflow-temp"
     blob_name = "config/input_output_config.json"
 
     client = storage.Client(credentials=credentials, project=project_id)
-    bucket = client.bucket(bucket_name)
-    blob = bucket.blob(blob_name)
-    content = blob.download_as_text()
+    content = client.bucket(bucket_name).blob(blob_name).download_as_text()
 
     return json.loads(content), project_id
 
@@ -25,7 +20,7 @@ def load_config_from_gcs():
 def run():
     config, project_id = load_config_from_gcs()
 
-    region = "us-central1"  # fixo, pode alterar aqui se quiser
+    region = "us-central1"
     input_subscription = f"projects/{project_id}/subscriptions/{config['input_topic']}"
     output_bucket = config["output_bucket"]
 
@@ -36,16 +31,17 @@ def run():
         runner="DataflowRunner",
         streaming=True,
     )
+    options.view_as(StandardOptions).streaming = True
 
     with beam.Pipeline(options=options) as p:
         events = (
             p
-            | "Read from Pub/Sub" >> beam.io.ReadFromPubSub(subscription=input_subscription)
-            | "Decode UTF-8" >> beam.Map(lambda x: x.decode("utf-8"))
+            | "Read PubSub" >> beam.io.ReadFromPubSub(subscription=input_subscription)
+            | "Decode" >> beam.Map(lambda x: x.decode("utf-8"))
             | "Parse JSON" >> beam.Map(json.loads)
         )
 
-        filtered = events | "Filter nulls" >> beam.Filter(lambda e: e is not None and e != "")
+        filtered = events | "Filter nulls" >> beam.Filter(lambda e: e)
 
         processed = (
             filtered
@@ -53,12 +49,23 @@ def run():
             | "Filter invalid" >> beam.Filter(lambda e: e is not None)
         )
 
-        (
+        # janela de 1 minuto para poder escrever streaming
+        windowed = (
             processed
-            | "Write to GCS" >> beam.io.WriteToText(
+            | "Window 1m" >> beam.WindowInto(
+                beam.window.FixedWindows(10),
+                trigger=beam.trigger.AfterProcessingTime(10),
+                accumulation_mode=beam.trigger.AccumulationMode.DISCARDING
+            )
+        )
+
+        (
+            windowed
+            | "To str" >> beam.Map(lambda e: json.dumps(e))
+            | "Write GCS" >> beam.io.WriteToText(
                 f"gs://{output_bucket}/events",
                 file_name_suffix=".json",
-                shard_name_template="-SSSSS-of-NNNNN"
+                shard_name_template="-SSSSS"
             )
         )
 
