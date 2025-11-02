@@ -59,7 +59,7 @@ def run():
                 | "PairWithKey" >> beam.Map(lambda x: ("", x))
                 | "WriteFiles" >> fileio.WriteToFiles(
                     path=f"gs://{OUTPUT_BUCKET}/events/",
-                    file_naming=fileio.FileNaming.prefix_suffix("output", ".json"),
+                    file_naming=fileio.FileNames.prefix_suffix("output", ".json"),
                     sink=lambda dest: fileio.TextSink()
                 )
             )
