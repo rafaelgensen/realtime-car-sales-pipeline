@@ -108,7 +108,8 @@ jobs:
             --project ${PROJECT_ID} \
             --region ${REGION} \
             --temp_location gs://${BUCKET}/temp \
-            --template_location gs://${BUCKET}/template/main-template
+            --template_location gs://${BUCKET}/template/main-template \
+            --setup_file ./dataflow/setup.py
 
       - name: Terraform Init
         working-directory: ./infra
