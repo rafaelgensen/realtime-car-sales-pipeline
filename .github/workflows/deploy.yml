@@ -78,7 +78,7 @@ jobs:
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
 
           echo "📦 Enviando scripts Python para gs://${BUCKET}/template/"
-          gsutil -m cp ./Dataflow/main.py gs://${BUCKET}/template/
+          gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
           gsutil -m cp -r ./Dataflow/utils gs://${BUCKET}/template/utils
 
       - name: Terraform Init
