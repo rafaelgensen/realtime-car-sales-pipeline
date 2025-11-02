@@ -79,7 +79,7 @@ jobs:
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
 
           echo '{
-            "input_topic": "'"${PROJECT_ID}"'-'"${ENV}"'-events-sub",
+            "input_topic": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-sub",
             "output_bucket": "cars-sales-'"${PROJECT_ID}"'-'"${ENV}"'-events-staging"
           }' > config.json
 
