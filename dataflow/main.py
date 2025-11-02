@@ -56,12 +56,11 @@ def run():
             (
                 windowed
                 | "ToJson" >> beam.Map(json.dumps)
+                | "PairWithKey" >> beam.Map(lambda x: ("", x))
                 | "WriteFiles" >> fileio.WriteToFiles(
-                    path_prefix=f"gs://{OUTPUT_BUCKET}/events/output",
-                    file_naming=fileio.destination_prefix_naming(),
-                    destination=lambda _: "",
-                    shards=5,
-                    sink=lambda: fileio.TextSink()
+                    path=f"gs://{OUTPUT_BUCKET}/events/",
+                    file_naming=fileio.FileNaming.prefix_suffix("output", ".json"),
+                    sink=lambda dest: fileio.TextSink()
                 )
             )
 
