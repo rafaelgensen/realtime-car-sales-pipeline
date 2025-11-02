@@ -57,7 +57,7 @@ jobs:
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
           gsutil ls -b gs://${BUCKET} >/dev/null 2>&1 || gsutil mb -l ${REGION} gs://${BUCKET}
 
-      - name: Upload dos scripts Dataflow (.py)
+      - name: Upload Dataflow scripts
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
@@ -66,19 +66,20 @@ jobs:
           gsutil -m cp ./dataflow/main.py gs://${BUCKET}/template/
           gsutil -m cp -r ./dataflow/utils gs://${BUCKET}/template/utils
 
-      - name: Upload config input_output_config.json
+      - name: Upload Dataflow config
         if: ${{ github.event.inputs.destroy != 'true' }}
         run: |
           PROJECT_ID=${{ fromJson(secrets.GCP_CREDENTIALS_JSON).project_id }}
           ENV=prod
           BUCKET="cars-sales-${PROJECT_ID}-${ENV}-dataflow-temp"
+
           cat <<EOF > config.json
           {
             "input_topic": "cars-sales-${PROJECT_ID}-${ENV}-events-sub",
             "output_bucket": "cars-sales-${PROJECT_ID}-${ENV}-events-staging"
           }
           EOF
-      
+
           gsutil cp config.json gs://${BUCKET}/config/input_output_config.json
 
       - name: Set Python 3.10
@@ -105,7 +106,7 @@ jobs:
             --region ${REGION} \
             --temp_location gs://${BUCKET}/temp \
             --template_location gs://${BUCKET}/template/main-template \
-            --is_template_build true \
+            --template \
             --setup_file ./dataflow/setup.py
 
       - name: Terraform Init
