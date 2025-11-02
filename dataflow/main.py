@@ -35,14 +35,17 @@ def run():
             accumulation_mode=beam.trigger.AccumulationMode.DISCARDING
         )
 
+        # Write to GCS manually per-window
         (
             windowed
             | "ToJson" >> beam.Map(json.dumps)
-            | "Write" >> beam.io.WriteToText(
-                file_path_prefix=f"gs://{OUTPUT_BUCKET}/events/output",
-                file_name_suffix=".json",
-                num_shards=5
-            ).with_windowed_writes()
+            | "WriteFiles" >> beam.io.fileio.WriteToFiles(
+                path_prefix=f"gs://{OUTPUT_BUCKET}/events/output",
+                file_naming=beam.io.fileio.destination_prefix_naming(),
+                destination=lambda _: "",
+                shards=5,
+                sink=lambda: beam.io.fileio.TextSink()
+            )
         )
 
 if __name__ == "__main__":
