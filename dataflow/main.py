@@ -1,34 +1,32 @@
-import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
-from apache_beam import window
 import json
+import apache_beam as beam
+from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, SetupOptions
 
 PROJECT_ID = "vaulted-acolyte-462921-v2"
-SUB = f"projects/{PROJECT_ID}/subscriptions/cars-sales-{PROJECT_ID}-prod-events-sub"
-OUT = f"gs://cars-sales-{PROJECT_ID}-prod-events-staging/events/output"
+SUBSCRIPTION = f"projects/{PROJECT_ID}/subscriptions/cars-sales-{PROJECT_ID}-prod-events-sub"
+BQ_TABLE = f"{PROJECT_ID}:streaming.raw_events"
 
 def run():
-    opts = PipelineOptions(
+    options = PipelineOptions(
         project=PROJECT_ID,
         region="us-central1",
         runner="DataflowRunner",
         temp_location=f"gs://cars-sales-{PROJECT_ID}-prod-dataflow-temp/temp",
-        streaming=True
+        streaming=True,
     )
-    opts.view_as(StandardOptions).streaming = True
+    options.view_as(StandardOptions).streaming = True
+    options.view_as(SetupOptions).save_main_session = True
 
-    with beam.Pipeline(options=opts) as p:
+    with beam.Pipeline(options=options) as p:
         (
             p
-            | "Read" >> beam.io.ReadFromPubSub(subscription=SUB)
-            | "Decode" >> beam.Map(lambda b: b.decode("utf-8"))
-            | "ParseJSON" >> beam.Map(lambda x: json.loads(x))
-            | "Window5s" >> beam.WindowInto(window.FixedWindows(5))
-            | "ToString" >> beam.Map(lambda x: json.dumps(x))
-            | "Write" >> beam.io.WriteToText(
-                file_path_prefix=OUT,
-                file_name_suffix=".json",
-                num_shards=1
+            | "ReadPubSub" >> beam.io.ReadFromPubSub(subscription=SUBSCRIPTION)
+            | "Decode" >> beam.Map(lambda x: x.decode("utf-8"))
+            | "Wrap" >> beam.Map(lambda m: {"payload": m})
+            | "WriteBQ" >> beam.io.WriteToBigQuery(
+                table=BQ_TABLE,
+                write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
+                create_disposition=beam.io.BigQueryDisposition.CREATE_NEVER,
             )
         )
 
