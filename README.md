@@ -1,8 +1,8 @@
 # Real-Time Automotive Events Pipeline (GCP)
 
-![Architecture Diagram](./assets/architecture.png)
+![Architecture Diagram](./assets/architecture2.png)
 
-## Objective
+## Summary
 
 This project implements a real-time automotive events pipeline on Google Cloud Platform.
 The goal is to ingest partner events (purchases and cancellations), validate and route them in-stream, store them for analytics and activation, and make the events available for downstream marketing systems (Segment → Google Ads).
